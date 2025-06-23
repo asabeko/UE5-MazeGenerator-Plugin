@@ -64,7 +64,7 @@ struct FMazeCoordinates
 };
 
 class Algorithm;
-class UHierarchicalInstancedStaticMeshComponent;
+class AStaticMeshActor;
 
 UCLASS()
 class MAZEGENERATOR_API AMaze : public AActor
@@ -96,6 +96,14 @@ public:
 		meta=(ExposeOnSpawn, DisplayPriority=2))
 	UStaticMesh* OutlineStaticMesh;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName="Wall Offset", Category="Maze|Cells",
+		meta=(ExposeOnSpawn, DisplayPriority=3))
+	FVector WallOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName="Outline Wall Offset", Category="Maze|Cells",
+		meta=(ExposeOnSpawn, DisplayPriority=4))
+	FVector OutlineWallOffset;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Maze|Pathfinder", meta=(ExposeOnSpawn))
 	bool bGeneratePath = false;
 
@@ -118,6 +126,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Maze")
 	bool bUseCollision = true;
 
+	UFUNCTION(CallInEditor, Category="Maze", meta=(DisplayPriority=0))
+	void GenerateMaze();
+
 protected:
 	TArray<TArray<uint8>> MazeGrid;
 
@@ -126,19 +137,19 @@ protected:
 	TMap<EGenerationAlgorithm, TSharedPtr<Algorithm>> GenerationAlgorithms;
 
 	UPROPERTY()
-	UHierarchicalInstancedStaticMeshComponent* FloorCells;
+	TArray<AStaticMeshActor*> FloorCells;
 
 	UPROPERTY()
-	UHierarchicalInstancedStaticMeshComponent* WallCells;
+	TArray<AStaticMeshActor*> WallCells;
 
 	UPROPERTY()
-	UHierarchicalInstancedStaticMeshComponent* OutlineWallCells;
+	TArray<AStaticMeshActor*> OutlineWallCells;
 
 	UPROPERTY()
-	UHierarchicalInstancedStaticMeshComponent* PathFloorCells;
+	TArray<AStaticMeshActor*> PathFloorCells;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Maze|Cells")
-	FVector2D MazeCellSize;	
+	FVector2D MazeCellSize;
 
 public:
 	// Update Maze according to pre-set parameters: Size, Generation Algorithm, Seed and Path-related params.
@@ -169,15 +180,15 @@ protected:
 	 * Generate Maze with random size, seed and 
 	 * algorithm with path connecting top-left and bottom-right corners.
 	 */
-	UFUNCTION(CallInEditor, Category="Maze", meta=(DisplayPriority=0, ShortTooltip = "Generate an arbitrary maze."))
+	UFUNCTION(CallInEditor, Category="Maze", meta=(DisplayPriority=1, ShortTooltip = "Generate an arbitrary maze."))
 	virtual void Randomize();
 
-	virtual void CreateMazeOutline() const;
+	virtual void CreateMazeOutline();
 
 	virtual void EnableCollision(const bool bShouldEnable);
 
 	// Clears all HISM instances.
-	virtual void ClearMaze() const;
+	virtual void ClearMaze();
 
 	virtual FVector2D GetMaxCellSize() const;
 

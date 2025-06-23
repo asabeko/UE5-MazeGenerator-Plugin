@@ -12,7 +12,8 @@
 #include "Algorithms/Prim.h"
 #include "Algorithms/Sidewinder.h"
 
-#include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 
 DEFINE_LOG_CATEGORY(LogMaze);
@@ -70,30 +71,6 @@ AMaze::AMaze()
 	GenerationAlgorithms.Add(EGenerationAlgorithm::Prim, TSharedPtr<Algorithm>(new Prim));
 
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-
-	FloorCells = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("FloorCells"));
-	if (FloorCells)
-	{
-		FloorCells->SetupAttachment(GetRootComponent());
-	}
-
-	PathFloorCells = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("PathFloorCells"));
-	if (PathFloorCells)
-	{
-		PathFloorCells->SetupAttachment(GetRootComponent());
-	}
-
-	WallCells = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("WallCells"));
-	if (WallCells)
-	{
-		WallCells->SetupAttachment(GetRootComponent());
-	}
-
-	OutlineWallCells = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("OutlineWallCells"));
-	if (OutlineWallCells)
-	{
-		OutlineWallCells->SetupAttachment(GetRootComponent());
-	}
 }
 
 void AMaze::UpdateMaze()
@@ -104,17 +81,6 @@ void AMaze::UpdateMaze()
 	{
 		UE_LOG(LogMaze, Warning, TEXT("To create maze specify FloorStaticMesh and WallStaticMesh."));
 		return;
-	}
-
-	FloorCells->SetStaticMesh(FloorStaticMesh);
-	WallCells->SetStaticMesh(WallStaticMesh);
-	if (OutlineStaticMesh)
-	{
-		OutlineWallCells->SetStaticMesh(OutlineStaticMesh);
-	}
-	if (PathStaticMesh)
-	{
-		PathFloorCells->SetStaticMesh(PathStaticMesh);
 	}
 
 	MazeCellSize = GetMaxCellSize();
@@ -136,20 +102,30 @@ void AMaze::UpdateMaze()
 	{
 		for (int32 X = 0; X < MazeSize.X; ++X)
 		{
-			if (bGeneratePath && PathStaticMesh && MazePathGrid.Num() > 0 && MazePathGrid[Y][X])
+			const FVector Location(GetActorLocation() + FVector(MazeCellSize.X * X, MazeCellSize.Y * Y, 0.f));
+			AStaticMeshActor* SpawnedActor = GetWorld()->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
+			if(SpawnedActor)
 			{
-				const FVector Location(MazeCellSize.X * X, MazeCellSize.Y * Y, 0.f);
-				PathFloorCells->AddInstance(FTransform(Location));
-			}
-			else if (MazeGrid[Y][X])
-			{
-				const FVector Location{MazeCellSize.X * X, MazeCellSize.Y * Y, 0.f};
-				FloorCells->AddInstance(FTransform(Location));
-			}
-			else
-			{
-				const FVector Location{MazeCellSize.X * X, MazeCellSize.Y * Y, 0.f};
-				WallCells->AddInstance(FTransform(Location));
+				UStaticMeshComponent* MeshComponent = SpawnedActor->GetStaticMeshComponent();
+				if(MeshComponent)
+				{
+					if (bGeneratePath && PathStaticMesh && MazePathGrid.Num() > 0 && MazePathGrid[Y][X])
+					{
+						MeshComponent->SetStaticMesh(PathStaticMesh);
+						PathFloorCells.Add(SpawnedActor);
+					}
+					else if (MazeGrid[Y][X])
+					{
+						MeshComponent->SetStaticMesh(FloorStaticMesh);
+						FloorCells.Add(SpawnedActor);
+					}
+					else
+					{
+						SpawnedActor->SetActorLocation(Location + WallOffset);
+						MeshComponent->SetStaticMesh(WallStaticMesh);
+						WallCells.Add(SpawnedActor);
+					}
+				}
 			}
 		}
 	}
@@ -157,7 +133,7 @@ void AMaze::UpdateMaze()
 	EnableCollision(bUseCollision);
 }
 
-void AMaze::CreateMazeOutline() const
+void AMaze::CreateMazeOutline()
 {
 	FVector Location1{0.f};
 	FVector Location2{0.f};
@@ -167,8 +143,18 @@ void AMaze::CreateMazeOutline() const
 	for (int32 X = -1; X < MazeSize.X + 1; ++X)
 	{
 		Location1.X = Location2.X = X * MazeCellSize.X;
-		OutlineWallCells->AddInstance(FTransform{Location1});
-		OutlineWallCells->AddInstance(FTransform{Location2});
+		AStaticMeshActor* SpawnedActor1 = GetWorld()->SpawnActor<AStaticMeshActor>(GetActorLocation() + Location1 + OutlineWallOffset, FRotator::ZeroRotator);
+		if(SpawnedActor1)
+		{
+			SpawnedActor1->GetStaticMeshComponent()->SetStaticMesh(OutlineStaticMesh);
+			OutlineWallCells.Add(SpawnedActor1);
+		}
+		AStaticMeshActor* SpawnedActor2 = GetWorld()->SpawnActor<AStaticMeshActor>(GetActorLocation() + Location2 + OutlineWallOffset, FRotator::ZeroRotator);
+		if(SpawnedActor2)
+		{
+			SpawnedActor2->GetStaticMeshComponent()->SetStaticMesh(OutlineStaticMesh);
+			OutlineWallCells.Add(SpawnedActor2);
+		}
 	}
 
 	Location1.X = -MazeCellSize.X;
@@ -176,8 +162,18 @@ void AMaze::CreateMazeOutline() const
 	for (int32 Y = 0; Y < MazeSize.Y; ++Y)
 	{
 		Location1.Y = Location2.Y = Y * MazeCellSize.Y;
-		OutlineWallCells->AddInstance(FTransform{Location1});
-		OutlineWallCells->AddInstance(FTransform{Location2});
+		AStaticMeshActor* SpawnedActor1 = GetWorld()->SpawnActor<AStaticMeshActor>(GetActorLocation() + Location1 + OutlineWallOffset, FRotator::ZeroRotator);
+		if(SpawnedActor1)
+		{
+			SpawnedActor1->GetStaticMeshComponent()->SetStaticMesh(OutlineStaticMesh);
+			OutlineWallCells.Add(SpawnedActor1);
+		}
+		AStaticMeshActor* SpawnedActor2 = GetWorld()->SpawnActor<AStaticMeshActor>(GetActorLocation() + Location2 + OutlineWallOffset, FRotator::ZeroRotator);
+		if(SpawnedActor2)
+		{
+			SpawnedActor2->GetStaticMeshComponent()->SetStaticMesh(OutlineStaticMesh);
+			OutlineWallCells.Add(SpawnedActor2);
+		}
 	}
 }
 
@@ -292,29 +288,52 @@ TArray<TArray<uint8>> AMaze::GetMazePath(const FMazeCoordinates& Start, const FM
 
 void AMaze::EnableCollision(const bool bShouldEnable)
 {
-	if (bShouldEnable)
+	ECollisionEnabled::Type CollisionType = bShouldEnable ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision;
+
+	for (AStaticMeshActor* Actor : FloorCells)
 	{
-		FloorCells->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		WallCells->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		OutlineWallCells->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		PathFloorCells->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		if(Actor) Actor->GetStaticMeshComponent()->SetCollisionEnabled(CollisionType);
 	}
-	else
+	for (AStaticMeshActor* Actor : WallCells)
 	{
-		FloorCells->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		WallCells->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		OutlineWallCells->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		PathFloorCells->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		if(Actor) Actor->GetStaticMeshComponent()->SetCollisionEnabled(CollisionType);
+	}
+	for (AStaticMeshActor* Actor : OutlineWallCells)
+	{
+		if(Actor) Actor->GetStaticMeshComponent()->SetCollisionEnabled(CollisionType);
+	}
+	for (AStaticMeshActor* Actor : PathFloorCells)
+	{
+		if(Actor) Actor->GetStaticMeshComponent()->SetCollisionEnabled(CollisionType);
 	}
 }
 
 
-void AMaze::ClearMaze() const
+void AMaze::ClearMaze()
 {
-	FloorCells->ClearInstances();
-	WallCells->ClearInstances();
-	OutlineWallCells->ClearInstances();
-	PathFloorCells->ClearInstances();
+	for (AStaticMeshActor* Actor : FloorCells)
+	{
+		if(Actor) Actor->Destroy();
+	}
+	FloorCells.Empty();
+
+	for (AStaticMeshActor* Actor : WallCells)
+	{
+		if(Actor) Actor->Destroy();
+	}
+	WallCells.Empty();
+
+	for (AStaticMeshActor* Actor : OutlineWallCells)
+	{
+		if(Actor) Actor->Destroy();
+	}
+	OutlineWallCells.Empty();
+
+	for (AStaticMeshActor* Actor : PathFloorCells)
+	{
+		if(Actor) Actor->Destroy();
+	}
+	PathFloorCells.Empty();
 }
 
 FVector2D AMaze::GetMaxCellSize() const
@@ -336,6 +355,11 @@ FVector2D AMaze::GetMaxCellSize() const
 		}
 	}
 	return MaxCellSize;
+}
+
+void AMaze::GenerateMaze()
+{
+	UpdateMaze();
 }
 
 void AMaze::Randomize()
@@ -361,14 +385,4 @@ void AMaze::Randomize()
 void AMaze::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-
-#if WITH_EDITOR
-	if (Transform.Equals(LastMazeTransform))
-	{
-#endif
-		UpdateMaze();
-#if WITH_EDITOR
-	}
-	LastMazeTransform = Transform;
-#endif
 }
