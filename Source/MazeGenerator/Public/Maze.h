@@ -174,6 +174,13 @@ public:
 	 */
 	virtual void OnConstruction(const FTransform& Transform) override;
 
+protected:
+	/**
+	 * Post-processes the maze grid to add loops and rooms.
+	 */
+	virtual void PostProcessLoopsAndRooms();
+
+public:
 	/**
 	 * Returns path grid mapped into MazeGrid constrains. Creates a graph every time it is called.
 	 *

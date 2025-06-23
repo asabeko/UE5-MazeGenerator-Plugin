@@ -96,6 +96,8 @@ void AMaze::UpdateMaze()
 	}
 	MazeGrid = GenerationAlgorithms[GenerationAlgorithm]->GetGrid(MazeSize, Seed);
 
+	PostProcessLoopsAndRooms();
+
 	if (bGeneratePath)
 	{
 		PathStart.ClampByMazeSize(MazeSize);
@@ -390,4 +392,42 @@ void AMaze::Randomize()
 void AMaze::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+}
+
+void AMaze::PostProcessLoopsAndRooms()
+{
+	if (LoopFactor <= 0.0f)
+	{
+		return;
+	}
+
+	TArray<FIntPoint> CandidateWalls;
+
+	// Identify candidate walls (cells with two open neighbors).
+	for (int32 Y = 1; Y < MazeSize.Y - 1; ++Y)
+	{
+		for (int32 X = 1; X < MazeSize.X - 1; ++X)
+		{
+			if (MazeGrid[Y][X] == 0) // Wall
+			{
+				if (MazeGrid[Y][X - 1] == 1 && MazeGrid[Y][X + 1] == 1) // Open neighbors on X axis
+				{
+					CandidateWalls.Add(FIntPoint(X, Y));
+				}
+				else if (MazeGrid[Y - 1][X] == 1 && MazeGrid[Y + 1][X] == 1) // Open neighbors on Y axis
+				{
+					CandidateWalls.Add(FIntPoint(X, Y));
+				}
+			}
+		}
+	}
+
+	// Remove walls based on LoopFactor.
+	for (const FIntPoint& Wall : CandidateWalls)
+	{
+		if (FMath::FRand() < LoopFactor)
+		{
+			MazeGrid[Wall.Y][Wall.X] = 1; // Open the wall
+		}
+	}
 }
