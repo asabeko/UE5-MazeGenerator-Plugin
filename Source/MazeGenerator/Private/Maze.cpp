@@ -396,38 +396,64 @@ void AMaze::OnConstruction(const FTransform& Transform)
 
 void AMaze::PostProcessLoopsAndRooms()
 {
-	if (LoopFactor <= 0.0f)
-	{
-		return;
-	}
+	FRandomStream RandomStream(Seed);
 
-	TArray<FIntPoint> CandidateWalls;
-
-	// Identify candidate walls (cells with two open neighbors).
-	for (int32 Y = 1; Y < MazeSize.Y - 1; ++Y)
+	// Braid Maze (Looping)
+	if (LoopFactor > 0.0f)
 	{
-		for (int32 X = 1; X < MazeSize.X - 1; ++X)
+		TArray<FIntPoint> CandidateWalls;
+
+		// Identify candidate walls (cells with two open neighbors).
+		for (int32 Y = 1; Y < MazeSize.Y - 1; ++Y)
 		{
-			if (MazeGrid[Y][X] == 0) // Wall
+			for (int32 X = 1; X < MazeSize.X - 1; ++X)
 			{
-				if (MazeGrid[Y][X - 1] == 1 && MazeGrid[Y][X + 1] == 1) // Open neighbors on X axis
+				if (MazeGrid[Y][X] == 0) // Wall
 				{
-					CandidateWalls.Add(FIntPoint(X, Y));
+					if (MazeGrid[Y][X - 1] == 1 && MazeGrid[Y][X + 1] == 1) // Open neighbors on X axis
+					{
+						CandidateWalls.Add(FIntPoint(X, Y));
+					}
+					else if (MazeGrid[Y - 1][X] == 1 && MazeGrid[Y + 1][X] == 1) // Open neighbors on Y axis
+					{
+						CandidateWalls.Add(FIntPoint(X, Y));
+					}
 				}
-				else if (MazeGrid[Y - 1][X] == 1 && MazeGrid[Y + 1][X] == 1) // Open neighbors on Y axis
-				{
-					CandidateWalls.Add(FIntPoint(X, Y));
-				}
+			}
+		}
+
+		// Remove walls based on LoopFactor.
+		for (const FIntPoint& Wall : CandidateWalls)
+		{
+			if (RandomStream.FRand() < LoopFactor)
+			{
+				MazeGrid[Wall.Y][Wall.X] = 1; // Open the wall
 			}
 		}
 	}
 
-	// Remove walls based on LoopFactor.
-	for (const FIntPoint& Wall : CandidateWalls)
+	// Carve Rooms (Plazas)
+	if (RoomChance > 0.0f)
 	{
-		if (FMath::FRand() < LoopFactor)
+		// Create a copy of the maze grid to prevent cascading room generation.
+		TArray<TArray<uint8>> MazeGridCopy = MazeGrid;
+
+		for (int32 Y = 1; Y < MazeSize.Y - 1; ++Y)
 		{
-			MazeGrid[Wall.Y][Wall.X] = 1; // Open the wall
+			for (int32 X = 1; X < MazeSize.X - 1; ++X)
+			{
+				if (MazeGridCopy[Y][X] == 1 && RandomStream.FRand() < RoomChance)
+				{
+					// Carve a room around this cell.
+					for (int32 RoomY = FMath::Max(0, Y - RoomRadius.Y); RoomY <= FMath::Min(MazeSize.Y - 1, Y + RoomRadius.Y); ++RoomY)
+					{
+						for (int32 RoomX = FMath::Max(0, X - RoomRadius.X); RoomX <= FMath::Min(MazeSize.X - 1, X + RoomRadius.X); ++RoomX)
+						{
+							MazeGrid[RoomY][RoomX] = 1;
+						}
+					}
+				}
+			}
 		}
 	}
 }
