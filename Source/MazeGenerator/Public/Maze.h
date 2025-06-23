@@ -84,6 +84,17 @@ public:
 	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category="Maze", meta=(ExposeOnSpawn, DisplayPriority=2))
 	FMazeSize MazeSize;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Maze|Generation Settings",
+		meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0", ExposeOnSpawn, DisplayPriority = 3))
+	float LoopFactor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Maze|Generation Settings",
+		meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0", ExposeOnSpawn, DisplayPriority = 4))
+	float RoomChance;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Maze|Generation Settings", meta = (ExposeOnSpawn, DisplayPriority = 5))
+	FIntPoint RoomRadius;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName="Floor", Category="Maze|Cells",
 		meta=(NoResetToDefault, ExposeOnSpawn, DisplayPriority=0))
 	UStaticMesh* FloorStaticMesh;
