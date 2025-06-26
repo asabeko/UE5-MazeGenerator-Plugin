@@ -180,6 +180,11 @@ protected:
 	 */
 	virtual void PostProcessLoopsAndRooms();
 
+private:
+	TArray<FIntPoint> GetDeadEnds() const;
+	void BraidMaze(TArray<FIntPoint>& DeadEnds, FRandomStream& RandomStream);
+	void CarveRooms(FRandomStream& RandomStream);
+
 public:
 	/**
 	 * Returns path grid mapped into MazeGrid constrains. Creates a graph every time it is called.
